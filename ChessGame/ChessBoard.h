@@ -22,11 +22,11 @@ public:
     Piece* generatePiece(int row, int col);
     bool loadTextures();
     void draw(sf::RenderWindow& window, Piece* selectedPiece) const;
-    void movePiece(int fromRow, int fromCol, int toRow, int toCol);
+    void movePiece(Square fromSquare, Square toSquare);
     std::string generateFEN(const std::string& castlingRights, bool isWhiteTurn, const std::string& enPassant, int halfMoveClock, int fullMoveCount) const;
     std::string boardToFEN() const;
     void updateCastleRights(Piece* piece, bool& whiteKingCastle, bool& whiteQueenCastle, bool& blackKingCastle, bool& blackQueenCastle);
-    std::string getEnPassantTarget(Piece* piece, int toRow) const;
+    std::string getEnPassantTarget(bool isWhite, Square oldSquare, Square newSquare) const;
 
     const sf::Texture& getPieceTexture(Piece* piece) const {
         return pieceTextures.at(piece->getType());
@@ -36,9 +36,10 @@ public:
         return board[row][col];
     }
 
-    std::string indexToLiteral(int row, int col) const {
-        return std::string(1, 'a' + col) + std::to_string(8 - row);
+    std::string squareToLiteral(Square square) const {
+        return std::string(1, 'a' + square.col) + std::to_string(8 - square.row);
     }
+
 
     bool isSquareOccupied(const Square& pos) const {
         return board[pos.row][pos.col] != nullptr;

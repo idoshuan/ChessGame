@@ -86,12 +86,12 @@ void ChessBoard::draw(sf::RenderWindow& window, Piece* selectedPiece) const {
 }
 
 
-void ChessBoard::movePiece(int fromRow, int fromCol, int toRow, int toCol) {
-	board[toRow][toCol] = board[fromRow][fromCol];
-	board[fromRow][fromCol] = nullptr;
-	board[toRow][toCol]->setSquare({ toRow, toCol });
-	board[toRow][toCol]->setPosition({ toCol * SQUARE_SIZE, toRow * SQUARE_SIZE });
-	//std::cout << indexToLiteral(fromRow, fromCol) << indexToLiteral(toRow, toCol) << "\n";
+void ChessBoard::movePiece(Square fromSquare, Square toSquare) {
+	delete board[toSquare.row][toSquare.col];
+	board[toSquare.row][toSquare.col] = board[fromSquare.row][fromSquare.col];
+	board[fromSquare.row][fromSquare.col] = nullptr;
+	board[toSquare.row][toSquare.col]->setSquare(toSquare);
+	board[toSquare.row][toSquare.col]->setPosition({ toSquare.col * SQUARE_SIZE, toSquare.row * SQUARE_SIZE });
 }
 
 
@@ -150,12 +150,12 @@ void ChessBoard::updateCastleRights(Piece* piece, bool& wk, bool& wq, bool& bk, 
 	}
 }
 
-std::string ChessBoard::getEnPassantTarget(Piece* piece, int toRow) const {
-	if (piece->getType() == PieceType::W_PAWN && piece->getSquare().row == 6 && toRow == 4) { // White pawn double move
-		return std::string(1, 'a' + piece->getSquare().col) + "3";
+std::string ChessBoard::getEnPassantTarget(bool isWhite, Square oldSquare, Square newSquare) const {
+	if (isWhite && oldSquare.row == 6 && newSquare.row == 4) { // White pawn double move
+		return std::string(1, 'a' + oldSquare.col) + "3";
 	}
-	else if (piece->getType() == PieceType::B_PAWN && piece->getSquare().row == 1 && toRow == 3) { // Black pawn double move
-		return std::string(1, 'a' + piece->getSquare().col) + "6";
+	else if (!isWhite && oldSquare.row == 1 && newSquare.row == 3) { // Black pawn double move
+		return std::string(1, 'a' + oldSquare.col) + "6";
 	}
 	return "-"; // No en passant
 }

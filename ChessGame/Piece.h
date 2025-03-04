@@ -43,25 +43,29 @@ struct Square {
 
 class Piece : public sf::Sprite {
 public:
-    Piece(Color color, const sf::Texture& texture, PieceType type, Square pos, ChessBoard* board) : sf::Sprite(texture), type(type), pos(pos), board(board) {
+    Piece(Color color, const sf::Texture& texture, PieceType type, Square square, ChessBoard* board) : sf::Sprite(texture), type(type), color(color), square(square), board(board) {
         setScale(sf::Vector2f(SQUARE_SIZE / getTexture().getSize().x, SQUARE_SIZE / getTexture().getSize().y));
-        setPosition(sf::Vector2f(pos.col * SQUARE_SIZE, pos.row * SQUARE_SIZE));
+        setPosition(sf::Vector2f(square.col * SQUARE_SIZE, square.row * SQUARE_SIZE));
     }
     virtual ~Piece() = default;
-    virtual std::vector<Square> getLegalMoves() const = 0;
+    virtual std::vector<Square> getLegalMoves(const std::string& enPassantTarget = "-") const = 0;
     static PieceType charToPieceType(char ch);
     static char pieceTypeToChar(PieceType type);
-    void setSquare(Square newPos) {
-        pos = newPos;
+    void setSquare(Square newSquare) {
+        square = newSquare;
     }
     Square getSquare() const {
-        return pos;
+        return square;
     }
     PieceType getType() const {
         return type;
     }
+    bool isWhite() const {
+        return color == Color::WHITE;
+    }
 protected:
     PieceType type;
-    Square pos;
+    Color color;
+    Square square;
     ChessBoard* board;
 };

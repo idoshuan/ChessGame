@@ -1,15 +1,16 @@
 #include "Game.h"
 
-Game::Game() : 
+Game::Game() :
 	window(sf::VideoMode({ 1200, 1200 }), "Chess Game", sf::Style::Close),
-	isWhiteTurn(true), 
+	isWhiteTurn(true),
 	whiteKingCastle(true), whiteQueenCastle(true), blackKingCastle(true), blackQueenCastle(true),
 	enPassantTarget("-"),
-	fullMoveCount(1), 
-	halfMoveClock(0), 
-	isDragging(false), 
-	selectedPiece(nullptr) 
-{}
+	fullMoveCount(1),
+	halfMoveClock(0),
+	isDragging(false),
+	selectedPiece(nullptr)
+{
+}
 
 
 void Game::run() {
@@ -61,9 +62,10 @@ void Game::onPieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPresse
 
 		dragOffset = { mouseButtonPressed->position.x - draggedSprite->getPosition().x, mouseButtonPressed->position.y - draggedSprite->getPosition().y };
 
-		legalMoves = selectedPiece->getLegalMoves();
+		legalMoves = selectedPiece->getLegalMoves(enPassantTarget);
+		std::cout << "Legal Moves:";
 		for (const auto& move : legalMoves) {
-			std::cout << chessBoard.indexToLiteral(move.row, move.col) << " ";
+			std::cout << chessBoard.squareToLiteral(move) << " ";
 		}
 		std::cout << "\n";
 	}
@@ -78,17 +80,19 @@ void Game::onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonRele
 		Square oldSquare = selectedPiece->getSquare();
 
 		auto isValidMove = [&](const Square& pos) {
-			const std::vector<Square>& legalMoves = selectedPiece->getLegalMoves();
 			return std::find(legalMoves.begin(), legalMoves.end(), pos) != legalMoves.end();
 			};
 
 		if (isValidMove(newSquare) && newSquare != oldSquare) {
-			chessBoard.movePiece(oldSquare.row, oldSquare.col, newSquare.row, newSquare.col);
+			chessBoard.movePiece(oldSquare, newSquare);
 			chessBoard.updateCastleRights(selectedPiece, whiteKingCastle, whiteQueenCastle, blackKingCastle, blackQueenCastle);
-			enPassantTarget = chessBoard.getEnPassantTarget(selectedPiece, newSquare.row);
+			if (selectedPiece->getType() == PieceType::W_PAWN || selectedPiece->getType() == PieceType::B_PAWN) {
+				enPassantTarget = chessBoard.getEnPassantTarget(selectedPiece->isWhite(), oldSquare, newSquare);
+			}
 			if (!isWhiteTurn) fullMoveCount++;
 			isWhiteTurn = !isWhiteTurn;
 		}
+		std::cout << "EnPassant Targets:" << enPassantTarget << "\n";
 	}
 
 	// Reset dragging variables
