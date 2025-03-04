@@ -1,28 +1,33 @@
 #pragma once
+
+#include <algorithm>
+
 #include "ChessBoard.h"
+#include "Piece.h"
 
 class Game {
 public:
     Game();
     void run();
+
 private:
     ChessBoard chessBoard;
     sf::RenderWindow window;
 
-    int fullMoveNumber;
+    int fullMoveCount;
     int halfMoveClock;
-    bool whiteToPlay;
-    bool wk, wq, bk, bq;
+    bool isWhiteTurn;
+    bool whiteKingCastle, whiteQueenCastle, blackKingCastle, blackQueenCastle;
     std::string enPassantTarget;
 
     bool isDragging;
-    char selectedPiece;
-    int selectedRow, selectedCol;
+    Piece* selectedPiece;
+    std::vector<Square> legalMoves;
+    std::optional<sf::Sprite> draggedSprite;
     sf::Vector2f dragOffset;
-    std::optional<sf::Sprite> dragSprite;
 
-    void handleEvents(std::optional<sf::Event>& event);
-    void pieceClicked(const sf::Event::MouseButtonPressed * mouseButtonPressed);
-    void pieceReleased(const sf::Event::MouseButtonReleased* mouseButtonPressed);
-    std::string castlingRightsToStr();
+    void handleEvents(const std::optional<sf::Event>& event);
+    void onPieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPressed);
+    void onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonReleased);
+    std::string getCastlingRights() const;
 };

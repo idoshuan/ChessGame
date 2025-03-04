@@ -1,15 +1,16 @@
 #include "Game.h"
 
-Game::Game() : window(sf::VideoMode({ 1200, 1200 }), "Chess Game", sf::Style::Close) {
-	whiteToPlay = true;
-	wk = wq = bk = bq = true;
-	enPassantTarget = "-";
-	fullMoveNumber = 1;
-	halfMoveClock = 0;
-	isDragging = false;
-	selectedPiece = '.';
-	selectedRow = selectedCol = -1;
-}
+Game::Game() : 
+	window(sf::VideoMode({ 1200, 1200 }), "Chess Game", sf::Style::Close),
+	isWhiteTurn(true), 
+	whiteKingCastle(true), whiteQueenCastle(true), blackKingCastle(true), blackQueenCastle(true),
+	enPassantTarget("-"),
+	fullMoveCount(1), 
+	halfMoveClock(0), 
+	isDragging(false), 
+	selectedPiece(nullptr) 
+{}
+
 
 void Game::run() {
 
@@ -19,84 +20,88 @@ void Game::run() {
 		}
 
 		window.clear();
-		chessBoard.draw(window, selectedRow, selectedCol);
-		if (isDragging && dragSprite.has_value()) {
-			window.draw(*dragSprite);
+		chessBoard.draw(window, selectedPiece);
+		if (isDragging && draggedSprite) {
+			window.draw(*draggedSprite);
 		}
 		window.display();
 	}
 }
 
-void Game::handleEvents(std::optional<sf::Event>& event) {
+void Game::handleEvents(const std::optional<sf::Event>& event) {
 	if (event->is<sf::Event::Closed>()) {
 		window.close();
 	}
-	else if (const auto* mouseButtonPressed = event->getIf<sf::Event::MouseButtonPressed>()) {
-		if (mouseButtonPressed->button == sf::Mouse::Button::Left) {
-			pieceClicked(mouseButtonPressed);
+	else if (const auto* mousePressed = event->getIf<sf::Event::MouseButtonPressed>()) {
+		if (mousePressed->button == sf::Mouse::Button::Left) {
+			onPieceClicked(mousePressed);
 		}
 	}
-	else if (const auto* mouseButtonReleased = event->getIf<sf::Event::MouseButtonReleased>()) {
-		if (mouseButtonReleased->button == sf::Mouse::Button::Left && isDragging) {
-			pieceReleased(mouseButtonReleased);
+	else if (const auto* mouseReleased = event->getIf<sf::Event::MouseButtonReleased>()) {
+		if (mouseReleased->button == sf::Mouse::Button::Left && isDragging) {
+			onPieceReleased(mouseReleased);
 		}
 	}
 	else if (const auto* mouseMoved = event->getIf<sf::Event::MouseMoved>()) {
-		if (isDragging && dragSprite.has_value()) {
-			dragSprite->setPosition(sf::Vector2f(mouseMoved->position.x - dragOffset.x, mouseMoved->position.y - dragOffset.y));
+		if (isDragging && draggedSprite.has_value()) {
+			draggedSprite->setPosition(sf::Vector2f(mouseMoved->position.x - dragOffset.x, mouseMoved->position.y - dragOffset.y));
 		}
 	}
 }
 
-void Game::pieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPressed) {
+void Game::onPieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPressed) {
+	int col = mouseButtonPressed->position.x / SQUARE_SIZE;
+	int row = mouseButtonPressed->position.y / SQUARE_SIZE;
 
-	int col = mouseButtonPressed->position.x / ChessBoard::getSquareSize();
-	int row = mouseButtonPressed->position.y / ChessBoard::getSquareSize();
-
-	if (chessBoard.getPiece(row, col) != '.') {
+	if ((selectedPiece = chessBoard.getPiece(row, col))) {
 		isDragging = true;
-		selectedPiece = chessBoard.getPiece(row, col);
-		selectedRow = row;
-		selectedCol = col;
+		draggedSprite.emplace(chessBoard.getPieceTexture(selectedPiece));
+		draggedSprite->setScale({ SQUARE_SIZE / draggedSprite->getTexture().getSize().x, SQUARE_SIZE / draggedSprite->getTexture().getSize().y });
+		draggedSprite->setPosition({ col * SQUARE_SIZE, row * SQUARE_SIZE });
 
-		if (!dragSprite.has_value()) {
-			dragSprite = sf::Sprite(chessBoard.getPieceTexture(selectedPiece));
+		dragOffset = { mouseButtonPressed->position.x - draggedSprite->getPosition().x, mouseButtonPressed->position.y - draggedSprite->getPosition().y };
+
+		legalMoves = selectedPiece->getLegalMoves();
+		for (const auto& move : legalMoves) {
+			std::cout << chessBoard.indexToLiteral(move.row, move.col) << " ";
 		}
-		dragSprite->setScale(sf::Vector2f(ChessBoard::getSquareSize() / dragSprite->getTexture().getSize().x, ChessBoard::getSquareSize() / dragSprite->getTexture().getSize().y));
-		dragSprite->setPosition(sf::Vector2f(col * ChessBoard::getSquareSize(), row * ChessBoard::getSquareSize()));
-
-		dragOffset.x = mouseButtonPressed->position.x - dragSprite->getPosition().x;
-		dragOffset.y = mouseButtonPressed->position.y - dragSprite->getPosition().y;
-
-		std::cout << chessBoard.generateFEN(castlingRightsToStr(), whiteToPlay, enPassantTarget, halfMoveClock, fullMoveNumber) << "\n";
+		std::cout << "\n";
 	}
 }
 
-void Game::pieceReleased(const sf::Event::MouseButtonReleased* mouseButtonPressed) {
-	int newRow = mouseButtonPressed->position.y / ChessBoard::getSquareSize();
-	int newCol = mouseButtonPressed->position.x / ChessBoard::getSquareSize();
+void Game::onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonReleased) {
+	int newRow = mouseButtonReleased->position.y / SQUARE_SIZE;
+	int newCol = mouseButtonReleased->position.x / SQUARE_SIZE;
+	Square newSquare = { newRow, newCol };
 
-	if (selectedPiece != '.' && (newRow != selectedRow || newCol != selectedCol)) {
-		chessBoard.movePiece(selectedRow, selectedCol, newRow, newCol);
-		chessBoard.updateCastleRights(selectedPiece, selectedRow, selectedCol, wk, wq, bk, bq);
-		enPassantTarget = chessBoard.getEnPassantTarget(selectedRow, newRow, newCol, selectedPiece);
-		if (!whiteToPlay) fullMoveNumber++;
-		whiteToPlay = !whiteToPlay;
+	if (selectedPiece) {
+		Square oldSquare = selectedPiece->getSquare();
+
+		auto isValidMove = [&](const Square& pos) {
+			const std::vector<Square>& legalMoves = selectedPiece->getLegalMoves();
+			return std::find(legalMoves.begin(), legalMoves.end(), pos) != legalMoves.end();
+			};
+
+		if (isValidMove(newSquare) && newSquare != oldSquare) {
+			chessBoard.movePiece(oldSquare.row, oldSquare.col, newSquare.row, newSquare.col);
+			chessBoard.updateCastleRights(selectedPiece, whiteKingCastle, whiteQueenCastle, blackKingCastle, blackQueenCastle);
+			enPassantTarget = chessBoard.getEnPassantTarget(selectedPiece, newSquare.row);
+			if (!isWhiteTurn) fullMoveCount++;
+			isWhiteTurn = !isWhiteTurn;
+		}
 	}
 
 	// Reset dragging variables
-	dragSprite.reset();
+	draggedSprite.reset();
 	isDragging = false;
-	selectedPiece = '.';
-	selectedRow = -1;
-	selectedCol = -1;
+	selectedPiece = nullptr;
 }
 
-std::string Game::castlingRightsToStr() {
-	std::string rights = "";
-	if (wk) rights += "K"; 
-	if (wq) rights += "Q";
-	if (bk) rights += "k";
-	if (bq) rights += "q";
-	return (rights.empty() ? "-" : rights);
+std::string Game::getCastlingRights() const {
+	std::string rights;
+	if (whiteKingCastle) rights += "K";
+	if (whiteQueenCastle) rights += "Q";
+	if (blackKingCastle) rights += "k";
+	if (blackQueenCastle) rights += "q";
+	return rights.empty() ? "-" : rights;
 }

@@ -1,189 +1,161 @@
 #include "ChessBoard.h"
 
-const char ChessBoard::originalBoard[boardSize][boardSize] = {
-        {'r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'},
-        {'p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'},
-        {'.', '.', '.', '.', '.', '.', '.', '.'},
-        {'.', '.', '.', '.', '.', '.', '.', '.'},
-        {'.', '.', '.', '.', '.', '.', '.', '.'},
-        {'.', '.', '.', '.', '.', '.', '.', '.'},
-        {'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'},
-        {'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'}
-};
-const float ChessBoard::squareSize = ChessBoard::windowSize / ChessBoard::boardSize;
+ChessBoard::ChessBoard() : boardTexture(sf::Vector2u(WINDOW_SIZE, WINDOW_SIZE)), boardSprite(boardTexture.getTexture()) {
+
+	if (!loadTextures()) {
+		std::cerr << "Error loading textures!" << std::endl;
+	}
+
+	for (int row = 0; row < BOARD_SIZE; ++row) {
+		for (int col = 0; col < BOARD_SIZE; ++col) {
+			sf::RectangleShape square({ SQUARE_SIZE, SQUARE_SIZE });
+			square.setPosition({ col * SQUARE_SIZE, row * SQUARE_SIZE });
+			square.setFillColor((row + col) % 2 == 0 ? sf::Color::White : sf::Color(118, 150, 86));
+			boardTexture.draw(square);
+			board[row][col] = generatePiece(row, col);
+		}
+	}
+	boardTexture.display();
+	boardSprite.setTexture(boardTexture.getTexture());
+}
 
 
-ChessBoard::ChessBoard() : boardTexture(sf::Vector2u(windowSize, windowSize)), boardSprite(boardTexture.getTexture()) {
+Piece* ChessBoard::generatePiece(int row, int col) {
+	auto type = Piece::charToPieceType(initialBoard[row][col]);
+	if (type == PieceType::NONE) return nullptr;
 
-    if (!loadTextures()) {
-        std::cerr << "Error loading textures!" << std::endl;
-    }
+	Color color = std::isupper(initialBoard[row][col]) ? Color::WHITE : Color::BLACK;
+	Square position = { row, col };
+	const sf::Texture& texture = pieceTextures.at(type);
 
-    for (int row = 0; row < boardSize; ++row) {
-        for (int col = 0; col < boardSize; ++col) {
-            sf::RectangleShape square(sf::Vector2f(squareSize, squareSize));
-            square.setPosition(sf::Vector2f(col * squareSize, row * squareSize));
-            square.setFillColor((row + col) % 2 == 0 ? sf::Color::White : sf::Color(118, 150, 86));
-            boardTexture.draw(square);
-        }
-    }
-    memcpy(currBoard, originalBoard, sizeof(originalBoard));
-    boardTexture.display();
-    boardSprite.setTexture(boardTexture.getTexture());
+	switch (type) {
+	case PieceType::W_PAWN: case PieceType::B_PAWN:
+		return new Pawn(color, texture, position, this);
+	case PieceType::W_KNIGHT: case PieceType::B_KNIGHT:
+		return new Knight(color, texture, position, this);
+	case PieceType::W_BISHOP: case PieceType::B_BISHOP:
+		return new Bishop(color, texture, position, this);
+	case PieceType::W_ROOK: case PieceType::B_ROOK:
+		return new Rook(color, texture, position, this);
+	case PieceType::W_QUEEN: case PieceType::B_QUEEN:
+		return new Queen(color, texture, position, this);
+	case PieceType::W_KING: case PieceType::B_KING:
+		return new King(color, texture, position, this);
+	default:
+		return nullptr;
+	}
 }
 
 bool ChessBoard::loadTextures() {
-    std::map<char, std::string> textureFiles = {
-        {'P', "pieces-png/wp.png"}, {'p', "pieces-png/bp.png"},
-        {'R', "pieces-png/wr.png"}, {'r', "pieces-png/br.png"},
-        {'N', "pieces-png/wn.png"}, {'n', "pieces-png/bn.png"},
-        {'B', "pieces-png/wb.png"}, {'b', "pieces-png/bb.png"},
-        {'Q', "pieces-png/wq.png"}, {'q', "pieces-png/bq.png"},
-        {'K', "pieces-png/wk.png"}, {'k', "pieces-png/bk.png"}
-    };
+	std::map<PieceType, std::string> textureFiles = {
+		{PieceType::W_PAWN,   "pieces-png/wp.png"},
+		{PieceType::B_PAWN,   "pieces-png/bp.png"},
+		{PieceType::W_ROOK,   "pieces-png/wr.png"},
+		{PieceType::B_ROOK,   "pieces-png/br.png"},
+		{PieceType::W_KNIGHT, "pieces-png/wn.png"},
+		{PieceType::B_KNIGHT, "pieces-png/bn.png"},
+		{PieceType::W_BISHOP, "pieces-png/wb.png"},
+		{PieceType::B_BISHOP, "pieces-png/bb.png"},
+		{PieceType::W_QUEEN,  "pieces-png/wq.png"},
+		{PieceType::B_QUEEN,  "pieces-png/bq.png"},
+		{PieceType::W_KING,   "pieces-png/wk.png"},
+		{PieceType::B_KING,   "pieces-png/bk.png"}
+	};
 
-    for (auto& [piece, file] : textureFiles) {
-        if (!pieceTextures[piece].loadFromFile(file)) {
-            std::cerr << "Failed to load texture: " << file << std::endl;
-            return false;
-        }
-        pieceTextures[piece].setSmooth(true);
-    }
-    return true;
+	for (const auto& [piece, file] : textureFiles) {
+		if (!pieceTextures[piece].loadFromFile(file)) {
+			std::cerr << "Failed to load texture: " << file << std::endl;
+			return false;
+		}
+		pieceTextures[piece].setSmooth(true);
+	}
+	return true;
 }
 
-void ChessBoard::draw(sf::RenderWindow& window, int selectedRow, int selectedCol) {
-    window.draw(boardSprite);
 
-    for (int row = 0; row < boardSize; ++row) {
-        for (int col = 0; col < boardSize; ++col) {
-            char piece = currBoard[row][col];
-            if (piece != '.' && (row != selectedRow || col != selectedCol)) {
-                sf::Sprite sprite(pieceTextures[piece]);
-                sprite.setScale(sf::Vector2f(squareSize / sprite.getTexture().getSize().x, squareSize / sprite.getTexture().getSize().y));
-                sprite.setPosition(sf::Vector2f(col * squareSize, row * squareSize));
-                window.draw(sprite);
-            }
-        }
-    }
+void ChessBoard::draw(sf::RenderWindow& window, Piece* selectedPiece) const {
+	window.draw(boardSprite);
+	for (int row = 0; row < BOARD_SIZE; ++row) {
+		for (int col = 0; col < BOARD_SIZE; ++col) {
+			Piece* piece = board[row][col];
+			if (piece && piece != selectedPiece) {
+				window.draw(*piece);
+			}
+		}
+	}
 }
+
 
 void ChessBoard::movePiece(int fromRow, int fromCol, int toRow, int toCol) {
-    currBoard[toRow][toCol] = currBoard[fromRow][fromCol];
-    currBoard[fromRow][fromCol] = '.';
-    //std::cout << indexToLiteral(fromRow, fromCol) << indexToLiteral(toRow, toCol) << "\n";
+	board[toRow][toCol] = board[fromRow][fromCol];
+	board[fromRow][fromCol] = nullptr;
+	board[toRow][toCol]->setSquare({ toRow, toCol });
+	board[toRow][toCol]->setPosition({ toCol * SQUARE_SIZE, toRow * SQUARE_SIZE });
+	//std::cout << indexToLiteral(fromRow, fromCol) << indexToLiteral(toRow, toCol) << "\n";
 }
 
-std::vector<std::string> ChessBoard::getLegalMovesFromStockfish(const std::string& fen) {
-    std::vector<std::string> legalMoves;
 
-    // Start Stockfish process
-    FILE* stockfish = _popen("stockfish.exe", "w+");
-    if (!stockfish) {
-        std::cerr << "Failed to start Stockfish!" << std::endl;
-        return legalMoves;
-    }
-
-    // Send UCI initialization commands
-    fprintf(stockfish, "uci\n");
-    fflush(stockfish);
-
-    // Set the position in FEN
-    fprintf(stockfish, "position fen %s\n", fen.c_str());
-    fflush(stockfish);
-
-    // Ask Stockfish for legal moves
-    fprintf(stockfish, "go perft 1\n"); // Returns all possible legal moves at depth 1
-    fflush(stockfish);
-
-    // Read Stockfish's output
-    std::string fullOutput;
-    char buffer[1024];  // Bigger buffer to avoid truncation
-
-    while (fgets(buffer, sizeof(buffer), stockfish) != nullptr) {
-        fullOutput += buffer;  // Store full response
-    }
-
-    // Close Stockfish process
-    _pclose(stockfish);
-
-    // Parse moves from the output
-    std::istringstream iss(fullOutput);
-    std::string word;
-
-    while (iss >> word) {
-        if (word == "Legal" || word == "moves:") {
-            continue;
-        }
-        else if (word.length() >= 4 && word.length() <= 5) {
-            legalMoves.push_back(word);  // Store only valid moves
-        }
-    }
-
-    return legalMoves;
+std::string ChessBoard::generateFEN(const std::string& castlingRights, bool isWhiteTurn, const std::string& enPassant, int halfMoveClock, int fullMoveCount) const {
+	return boardToFEN() + " " + (isWhiteTurn ? "w" : "b") + " " + (castlingRights.empty() ? "-" : castlingRights) + " " + (enPassant.empty() ? "-" : enPassant) + " " + std::to_string(halfMoveClock) + " " + std::to_string(fullMoveCount);
 }
 
-std::string ChessBoard::generateFEN(std::string castlingRights, bool whiteToPlay, std::string enPassant, int halfmoveClock, int fullmoveNumber) {
-
-    std::string fen = boardToFEN();  // Get board representation
-
-    fen += " " + std::string(whiteToPlay ? "w" : "b");
-    fen += " " + (castlingRights.empty() ? "-" : castlingRights);  // Castling rights
-    fen += " " + (enPassant.empty() ? "-" : enPassant);  // En passant target square
-    fen += " " + std::to_string(halfmoveClock);  // Halfmove clock
-    fen += " " + std::to_string(fullmoveNumber);  // Fullmove number
-
-    return fen;
+std::string ChessBoard::boardToFEN() const {
+	std::string fen;
+	for (int row = 0; row < BOARD_SIZE; ++row) {
+		int emptyCount = 0;
+		for (int col = 0; col < BOARD_SIZE; ++col) {
+			char piece = Piece::pieceTypeToChar(board[row][col] ? board[row][col]->getType() : PieceType::NONE);
+			if (piece == '.') {
+				emptyCount++;
+			}
+			else {
+				if (emptyCount > 0) {
+					fen += std::to_string(emptyCount);
+					emptyCount = 0;
+				}
+				fen += piece;
+			}
+		}
+		if (emptyCount > 0) fen += std::to_string(emptyCount);
+		if (row < BOARD_SIZE - 1) fen += "/";
+	}
+	return fen;
 }
 
-std::string ChessBoard::boardToFEN() {
-    std::string fen = "";
+void ChessBoard::updateCastleRights(Piece* piece, bool& wk, bool& wq, bool& bk, bool& bq) {
+	int fromRow = piece->getSquare().row;
+	int fromCol = piece->getSquare().col;
 
-    for (int row = 0; row < 8; row++) {
-        int emptyCount = 0; // Count empty squares
-        for (int col = 0; col < 8; col++) {
-            char piece = currBoard[row][col];
-
-            if (piece == '.') { // Empty square
-                emptyCount++;
-            }
-            else {
-                if (emptyCount > 0) {
-                    fen += std::to_string(emptyCount); // Add empty count before placing a piece
-                    emptyCount = 0;
-                }
-                fen += piece; // Add piece character (e.g., 'r')
-            }
-        }
-        if (emptyCount > 0) {
-            fen += std::to_string(emptyCount); // Add any remaining empty squares
-        }
-        if (row < 7) fen += "/"; // Separate ranks
-    }
-
-    return fen;
+	switch (piece->getType()) {
+	case PieceType::W_KING:
+		wk = false; wq = false;
+		break;
+	case PieceType::B_KING:
+		bk = false; bq = false;
+		break;
+	case PieceType::W_ROOK:
+		if (fromRow == 7) {
+			if (fromCol == 0) wq = false;
+			else if (fromCol == 7) wk = false;
+		}
+		break;
+	case PieceType::B_ROOK:
+		if (fromRow == 0) {
+			if (fromCol == 0) bq = false;
+			else if (fromCol == 7) bk = false;
+		}
+		break;
+	default:
+		break;
+	}
 }
 
-void ChessBoard::updateCastleRights(char piece, int fromRow, int fromCol, bool& wk, bool& wq, bool& bk, bool& bq) {
-    if (piece == 'K') { wk = false; wq = false; } 
-    else if (piece == 'k') { bk = false; bq = false; } 
-    else if (piece == 'R' && fromRow == 7) {
-        if (fromCol == 0) wq = false; 
-        else if (fromCol == 7) wk = false; 
-    }
-    else if (piece == 'r' && fromRow == 0) {
-        if (fromCol == 0) bq = false; 
-        else if (fromCol == 7) bk = false; 
-    }
-    //std::cout << wk << wq << bk << bq << "\n";
-}
-
-std::string ChessBoard::getEnPassantTarget(int fromRow, int toRow, int col, char piece) {
-    if (piece == 'P' && fromRow == 6 && toRow == 4) { // White pawn double move
-        return std::string(1, 'a' + col) + "3"; 
-    }
-    if (piece == 'p' && fromRow == 1 && toRow == 3) { // Black pawn double move
-        return std::string(1, 'a' + col) + "6"; 
-    }
-    return "-"; // No en passant
+std::string ChessBoard::getEnPassantTarget(Piece* piece, int toRow) const {
+	if (piece->getType() == PieceType::W_PAWN && piece->getSquare().row == 6 && toRow == 4) { // White pawn double move
+		return std::string(1, 'a' + piece->getSquare().col) + "3";
+	}
+	else if (piece->getType() == PieceType::B_PAWN && piece->getSquare().row == 1 && toRow == 3) { // Black pawn double move
+		return std::string(1, 'a' + piece->getSquare().col) + "6";
+	}
+	return "-"; // No en passant
 }
