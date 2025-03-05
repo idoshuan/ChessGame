@@ -5,5 +5,5 @@
 class Rook : public Piece {
 public:
 	Rook(Color color, const sf::Texture& texture, Square pos, ChessBoard* board) : Piece(color, texture, (color == Color::WHITE ? PieceType::W_ROOK: PieceType::B_ROOK), pos, board) {}
-	std::vector<Square> getLegalMoves(const std::string& enPassantTarget = "-") const override;
+	std::vector<Square> getPossibleMoves(const std::string& enPassantTarget) const override;
 };

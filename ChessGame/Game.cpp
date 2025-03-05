@@ -52,10 +52,10 @@ void Game::onPieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPresse
 	int col = mouseButtonPressed->position.x / SQUARE_SIZE;
 	int row = mouseButtonPressed->position.y / SQUARE_SIZE;
 
-	if (selectedPiece = chessBoard.getPiece(row, col)) {
+	if (selectedPiece = chessBoard.getPiece({ row, col })) {
 		origianlPosition = selectedPiece->getPosition();
 		dragOffset = { mouseButtonPressed->position.x - selectedPiece->getPosition().x, mouseButtonPressed->position.y - selectedPiece->getPosition().y };
-		auto legalMoves = selectedPiece->getLegalMoves(enPassantTarget);
+		auto legalMoves = chessBoard.getLegalMoves(selectedPiece, enPassantTarget);
 		std::cout << "Legal Moves:";
 		for (const auto& move : legalMoves) {
 			std::cout << chessBoard.squareToLiteral(move) << " ";
@@ -73,14 +73,15 @@ void Game::onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonRele
 		Square oldSquare = selectedPiece->getSquare();
 
 		auto isValidMove = [&](const Square& pos) {
-			auto legalMoves = selectedPiece->getLegalMoves(enPassantTarget);
+			auto legalMoves = chessBoard.getLegalMoves(selectedPiece, enPassantTarget);
 			return std::find(legalMoves.begin(), legalMoves.end(), pos) != legalMoves.end();
 			};
 
 		if (isValidMove(newSquare)) {
-			chessBoard.movePiece(oldSquare, newSquare);
+			bool isPawn = selectedPiece->getType() == PieceType::W_PAWN || selectedPiece->getType() == PieceType::B_PAWN;
+			chessBoard.movePiece(oldSquare, newSquare, isPawn ? ChessBoard::literalToSquare(enPassantTarget) : Square{ -1, -1 });
 			chessBoard.updateCastleRights(selectedPiece);
-			if (selectedPiece->getType() == PieceType::W_PAWN || selectedPiece->getType() == PieceType::B_PAWN) {
+			if (isPawn) {
 				enPassantTarget = chessBoard.getEnPassantTarget(selectedPiece->isWhite(), oldSquare, newSquare);
 			}
 			if (!isWhiteTurn) {
@@ -91,7 +92,6 @@ void Game::onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonRele
 		else {
 			selectedPiece->setPosition(origianlPosition);
 		}
-		std::cout << "EnPassant Targets:" << enPassantTarget << "\n";
 	}
 
 	// Reset dragging variables

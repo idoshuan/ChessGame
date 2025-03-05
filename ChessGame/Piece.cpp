@@ -1,4 +1,24 @@
 #include "Piece.h"
+#include "ChessBoard.h"
+
+Piece* Piece::createPiece(PieceType type, Color color, const sf::Texture& texture, Square position, ChessBoard* board) {
+    switch (type) {
+    case PieceType::W_PAWN: case PieceType::B_PAWN:
+        return new Pawn(color, texture, position, board);
+    case PieceType::W_KNIGHT: case PieceType::B_KNIGHT:
+        return new Knight(color, texture, position, board);
+    case PieceType::W_BISHOP: case PieceType::B_BISHOP:
+        return new Bishop(color, texture, position, board);
+    case PieceType::W_ROOK: case PieceType::B_ROOK:
+        return new Rook(color, texture, position, board);
+    case PieceType::W_QUEEN: case PieceType::B_QUEEN:
+        return new Queen(color, texture, position, board);
+    case PieceType::W_KING: case PieceType::B_KING:
+        return new King(color, texture, position, board);
+    default:
+        return nullptr; // Should never happen if input is valid
+    }
+}
 
 PieceType Piece::charToPieceType(char ch) {
     switch (ch) {

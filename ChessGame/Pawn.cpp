@@ -1,55 +1,39 @@
 #include "Pawn.h"
 #include "ChessBoard.h"
 
-std::vector<Square> Pawn::getLegalMoves(const std::string& enPassantTarget) const {
+std::vector<Square> Pawn::getPossibleMoves(const std::string& enPassantTarget) const {
     std::vector<Square> moves;
-
     int dir = (type == PieceType::W_PAWN) ? -1 : 1; // White moves up (-1), Black moves down (+1)
-    int startRow = (type == PieceType::W_PAWN) ? 6 : 1; 
+    int startRow = (type == PieceType::W_PAWN) ? 6 : 1;
 
-    // Regular movement
-    Square firstSquare = { square.row + dir, square.col };
-    Square secondSquare = { square.row + 2 * dir, square.col };
+    // Movement (1 or 2 squares forward)
+    for (int step = 1; step <= (square.row == startRow ? 2 : 1); ++step) {
+        Square nextSquare = { square.row + step * dir, square.col };
+        if (!board->isSquareValid(nextSquare) || board->isSquareOccupied(nextSquare)) break;
+        moves.push_back(nextSquare);
+    }
 
-    bool firstOccupied = board->isSquareOccupied(firstSquare);
-    bool secondOccupied = board->isSquareOccupied(secondSquare);
-
-    if (!firstOccupied) {
-        moves.push_back(firstSquare);
-
-        if (square.row == startRow && !secondOccupied) {
-            moves.push_back(secondSquare);
+    // Captures (left & right diagonals)
+    Square captureOffsets[] = { {dir, -1}, {dir, 1} };
+    for (Square offset : captureOffsets) {
+        Square captureSquare = { square.row + offset.row, square.col + offset.col };
+        if (board->isSquareValid(captureSquare) && board->isSquareOccupied(captureSquare)) {
+            Piece* target = board->getPiece(captureSquare);
+            if (target && target->isWhite() != this->isWhite()) {
+                moves.push_back(captureSquare);
+            }
         }
     }
 
-    // Regular captures
-    Square leftCapture = { square.row + dir, square.col - 1 };
-    Square rightCapture = { square.row + dir, square.col + 1 };
-
-    if (square.col > 0 && board->isSquareOccupied(leftCapture)) { // Left diagonal capture
-        Piece* target = board->getPiece(leftCapture.row, leftCapture.col);
-        if (target && target->isWhite() != this->isWhite()) {
-            moves.push_back(leftCapture);
-        }
-    }
-
-    if (square.col < BOARD_SIZE - 1 && board->isSquareOccupied(rightCapture)) { // Right diagonal capture
-        Piece* target = board->getPiece(rightCapture.row, rightCapture.col);
-        if (target && target->isWhite() != this->isWhite()) {
-            moves.push_back(rightCapture);
-        }
-    }
-
-    // En Passant Capture (if applicable)
+    // En Passant Capture
     if (enPassantTarget != "-") {
-        int enPassantCol = enPassantTarget[0] - 'a';
-        int enPassantRow = 8 - (enPassantTarget[1] - '0');
-        // Check if en passant square is valid for this pawn
-        if (enPassantRow == square.row + dir && (enPassantCol == square.col - 1 || enPassantCol == square.col + 1)) {
-            moves.push_back({ enPassantRow, enPassantCol });
+        Square enPassantSquare = { 8 - (enPassantTarget[1] - '0'), enPassantTarget[0] - 'a' };
+        if (enPassantSquare.row == square.row + dir && abs(enPassantSquare.col - square.col) == 1) {
+            moves.push_back(enPassantSquare);
         }
     }
 
     return moves;
 }
+
 

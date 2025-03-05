@@ -22,7 +22,9 @@ public:
     Piece* generatePiece(int row, int col);
     bool loadTextures();
     void draw(sf::RenderWindow& window, Piece* selectedPiece) const;
-    void movePiece(Square fromSquare, Square toSquare);
+    void movePiece(Square fromSquare, Square toSquare, Square enPassantSquare = {-1,-1});
+    std::vector<Square> getLegalMoves(Piece* piece, std::string enPassantTarget = "-");
+    bool doesMoveLeaveKingInCheck(Square from, Square to, std::string enPassantTarget);
     std::string generateFEN(const std::string& castlingRights, bool isWhiteTurn, const std::string& enPassant, int halfMoveClock, int fullMoveCount) const;
     std::string boardToFEN() const;
     void updateCastleRights(Piece* piece);
@@ -33,17 +35,25 @@ public:
         return pieceTextures.at(piece->getType());
     }
 
-    Piece* getPiece(int row, int col) const {
-        return board[row][col];
+    Piece* getPiece(Square square) const {
+        return board[square.row][square.col];
     }
 
-    std::string squareToLiteral(Square square) const {
+    bool isSquareValid(Square square) const {
+        return square.row < BOARD_SIZE && square.col < BOARD_SIZE && square.row >= 0 && square.col >= 0;
+    }
+
+    static Square literalToSquare(std::string s) {
+        return { 8 - (s[1] - '0'), s[0] - 'a' };
+    }
+
+    static std::string squareToLiteral(Square square) {
         return std::string(1, 'a' + square.col) + std::to_string(8 - square.row);
     }
 
 
-    bool isSquareOccupied(const Square& pos) const {
-        return board[pos.row][pos.col] != nullptr;
+    bool isSquareOccupied(const Square& square) const {
+        return board[square.row][square.col] != nullptr;
     }
 
 private:
@@ -63,4 +73,7 @@ private:
     sf::Sprite boardSprite;
     std::map<PieceType, sf::Texture> pieceTextures;
     bool whiteKingCastle, whiteQueenCastle, blackKingCastle, blackQueenCastle;
+
+    bool isKingInCheck(bool isWhite, std::string enPassantTarget) const;
+    Square findKing(bool isWhite) const;
 };

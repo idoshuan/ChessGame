@@ -1,5 +1,11 @@
 #include "ChessBoard.h"
 
+/**
+ * @brief  Initializes the chessboard and loads textures.
+ *
+ * The board background is drawn once into a texture for performance optimization.
+ * It also initializes castling rights and sets up the pieces.
+ */
 ChessBoard::ChessBoard() : boardTexture(sf::Vector2u(WINDOW_SIZE, WINDOW_SIZE)), boardSprite(boardTexture.getTexture()), whiteKingCastle(true), whiteQueenCastle(true), blackKingCastle(true), blackQueenCastle(true) {
 
 	if (!loadTextures()) {
@@ -19,7 +25,12 @@ ChessBoard::ChessBoard() : boardTexture(sf::Vector2u(WINDOW_SIZE, WINDOW_SIZE)),
 	boardSprite.setTexture(boardTexture.getTexture());
 }
 
-
+/**
+ * @brief  Creates a chess piece based on the initial board setup.
+ *
+ * Uses the predefined `initialBoard` array to generate each piece at its
+ * starting position.
+ */
 Piece* ChessBoard::generatePiece(int row, int col) {
 	auto type = Piece::charToPieceType(initialBoard[row][col]);
 	if (type == PieceType::NONE) return nullptr;
@@ -27,23 +38,7 @@ Piece* ChessBoard::generatePiece(int row, int col) {
 	Color color = std::isupper(initialBoard[row][col]) ? Color::WHITE : Color::BLACK;
 	Square position = { row, col };
 	const sf::Texture& texture = pieceTextures.at(type);
-
-	switch (type) {
-	case PieceType::W_PAWN: case PieceType::B_PAWN:
-		return new Pawn(color, texture, position, this);
-	case PieceType::W_KNIGHT: case PieceType::B_KNIGHT:
-		return new Knight(color, texture, position, this);
-	case PieceType::W_BISHOP: case PieceType::B_BISHOP:
-		return new Bishop(color, texture, position, this);
-	case PieceType::W_ROOK: case PieceType::B_ROOK:
-		return new Rook(color, texture, position, this);
-	case PieceType::W_QUEEN: case PieceType::B_QUEEN:
-		return new Queen(color, texture, position, this);
-	case PieceType::W_KING: case PieceType::B_KING:
-		return new King(color, texture, position, this);
-	default:
-		return nullptr;
-	}
+	return Piece::createPiece(type, color, pieceTextures.at(type), position, this);
 }
 
 bool ChessBoard::loadTextures() {
@@ -86,14 +81,80 @@ void ChessBoard::draw(sf::RenderWindow& window, Piece* selectedPiece) const {
 }
 
 
-void ChessBoard::movePiece(Square fromSquare, Square toSquare) {
-	delete board[toSquare.row][toSquare.col];
+void ChessBoard::movePiece(Square fromSquare, Square toSquare, Square enPassantSquare) {
+	if (toSquare == enPassantSquare) {
+		delete board[fromSquare.row][toSquare.col];
+		board[fromSquare.row][toSquare.col] = nullptr;
+	}
+	else {
+		delete board[toSquare.row][toSquare.col];
+	}
 	board[toSquare.row][toSquare.col] = board[fromSquare.row][fromSquare.col];
 	board[fromSquare.row][fromSquare.col] = nullptr;
 	board[toSquare.row][toSquare.col]->setSquare(toSquare);
 	board[toSquare.row][toSquare.col]->setPosition({ toSquare.col * SQUARE_SIZE, toSquare.row * SQUARE_SIZE });
 }
 
+std::vector<Square> ChessBoard::getLegalMoves(Piece* piece, std::string enPassantTarget) {
+	std::vector<Square> moves = piece->getPossibleMoves(enPassantTarget);
+	std::vector<Square> safeMoves;
+
+	for (const Square& move : moves) {
+		if (!doesMoveLeaveKingInCheck(piece->getSquare(), move, enPassantTarget)) {
+			safeMoves.push_back(move);
+		}
+	}
+	return safeMoves;
+}
+
+bool ChessBoard::doesMoveLeaveKingInCheck(Square from, Square to, std::string enPassantTarget) {
+	Piece* movedPiece = getPiece(from);
+	Piece* capturedPiece = getPiece(to);
+
+	// Simulate move
+	board[to.row][to.col] = movedPiece;
+	board[from.row][from.col] = nullptr;
+	movedPiece->setSquare(to);
+
+	bool isInCheck = isKingInCheck(movedPiece->isWhite(), enPassantTarget);
+
+	// Undo move
+	board[from.row][from.col] = movedPiece;
+	board[to.row][to.col] = capturedPiece;
+	movedPiece->setSquare(from);
+
+	return isInCheck;
+}
+
+bool ChessBoard::isKingInCheck(bool isWhite, std::string enPassantTarget) const {
+	Square kingSquare = findKing(isWhite);
+
+	for (int row = 0; row < BOARD_SIZE; ++row) {
+		for (int col = 0; col < BOARD_SIZE; ++col) {
+			Piece* piece = getPiece({ row, col });
+			if (!piece || piece->isWhite() == isWhite) continue;
+
+			std::vector<Square> moves = piece->getPossibleMoves(enPassantTarget);
+			if (std::find(moves.begin(), moves.end(), kingSquare) != moves.end()) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+Square ChessBoard::findKing(bool isWhite) const{
+	PieceType kingType = isWhite ? PieceType::W_KING : PieceType::B_KING;
+	for (int row = 0; row < BOARD_SIZE; ++row) {
+		for (int col = 0; col < BOARD_SIZE; ++col) {
+			Piece* piece = getPiece({ row, col });
+			if (piece && piece->getType() == kingType) {
+				return piece->getSquare();
+			}
+		}
+	}
+	throw std::runtime_error("No king found on the board!");
+}
 
 std::string ChessBoard::generateFEN(const std::string& castlingRights, bool isWhiteTurn, const std::string& enPassant, int halfMoveClock, int fullMoveCount) const {
 	return boardToFEN() + " " + (isWhiteTurn ? "w" : "b") + " " + (castlingRights.empty() ? "-" : castlingRights) + " " + (enPassant.empty() ? "-" : enPassant) + " " + std::to_string(halfMoveClock) + " " + std::to_string(fullMoveCount);

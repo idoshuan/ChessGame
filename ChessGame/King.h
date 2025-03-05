@@ -5,5 +5,5 @@
 class King : public Piece {
 public:
 	King(Color color, const sf::Texture& texture, Square pos, ChessBoard* board) : Piece(color, texture, (color == Color::WHITE ? PieceType::W_KING : PieceType::B_KING), pos, board) {}
-	std::vector<Square> getLegalMoves(const std::string& enPassantTarget = "-") const override;
+	std::vector<Square> getPossibleMoves(const std::string& enPassantTarget) const override;
 };
