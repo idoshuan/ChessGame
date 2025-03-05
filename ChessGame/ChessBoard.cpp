@@ -1,6 +1,6 @@
 #include "ChessBoard.h"
 
-ChessBoard::ChessBoard() : boardTexture(sf::Vector2u(WINDOW_SIZE, WINDOW_SIZE)), boardSprite(boardTexture.getTexture()) {
+ChessBoard::ChessBoard() : boardTexture(sf::Vector2u(WINDOW_SIZE, WINDOW_SIZE)), boardSprite(boardTexture.getTexture()), whiteKingCastle(true), whiteQueenCastle(true), blackKingCastle(true), blackQueenCastle(true) {
 
 	if (!loadTextures()) {
 		std::cerr << "Error loading textures!" << std::endl;
@@ -122,27 +122,27 @@ std::string ChessBoard::boardToFEN() const {
 	return fen;
 }
 
-void ChessBoard::updateCastleRights(Piece* piece, bool& wk, bool& wq, bool& bk, bool& bq) {
+void ChessBoard::updateCastleRights(Piece* piece) {
 	int fromRow = piece->getSquare().row;
 	int fromCol = piece->getSquare().col;
 
 	switch (piece->getType()) {
 	case PieceType::W_KING:
-		wk = false; wq = false;
+		whiteKingCastle = false; whiteQueenCastle = false;
 		break;
 	case PieceType::B_KING:
-		bk = false; bq = false;
+		blackKingCastle = false; blackQueenCastle = false;
 		break;
 	case PieceType::W_ROOK:
 		if (fromRow == 7) {
-			if (fromCol == 0) wq = false;
-			else if (fromCol == 7) wk = false;
+			if (fromCol == 0) whiteQueenCastle = false;
+			else if (fromCol == 7) whiteKingCastle = false;
 		}
 		break;
 	case PieceType::B_ROOK:
 		if (fromRow == 0) {
-			if (fromCol == 0) bq = false;
-			else if (fromCol == 7) bk = false;
+			if (fromCol == 0) blackQueenCastle = false;
+			else if (fromCol == 7) blackKingCastle = false;
 		}
 		break;
 	default:
@@ -158,4 +158,13 @@ std::string ChessBoard::getEnPassantTarget(bool isWhite, Square oldSquare, Squar
 		return std::string(1, 'a' + oldSquare.col) + "6";
 	}
 	return "-"; // No en passant
+}
+
+std::string ChessBoard::getCastlingRights() const {
+	std::string rights;
+	if (whiteKingCastle) rights += "K";
+	if (whiteQueenCastle) rights += "Q";
+	if (blackKingCastle) rights += "k";
+	if (blackQueenCastle) rights += "q";
+	return rights.empty() ? "-" : rights;
 }

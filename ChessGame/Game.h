@@ -17,17 +17,13 @@ private:
     int fullMoveCount;
     int halfMoveClock;
     bool isWhiteTurn;
-    bool whiteKingCastle, whiteQueenCastle, blackKingCastle, blackQueenCastle;
     std::string enPassantTarget;
 
-    bool isDragging;
     Piece* selectedPiece;
-    std::vector<Square> legalMoves;
-    std::optional<sf::Sprite> draggedSprite;
     sf::Vector2f dragOffset;
+    sf::Vector2f origianlPosition;
 
     void handleEvents(const std::optional<sf::Event>& event);
     void onPieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPressed);
     void onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonReleased);
-    std::string getCastlingRights() const;
 };

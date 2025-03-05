@@ -25,8 +25,9 @@ public:
     void movePiece(Square fromSquare, Square toSquare);
     std::string generateFEN(const std::string& castlingRights, bool isWhiteTurn, const std::string& enPassant, int halfMoveClock, int fullMoveCount) const;
     std::string boardToFEN() const;
-    void updateCastleRights(Piece* piece, bool& whiteKingCastle, bool& whiteQueenCastle, bool& blackKingCastle, bool& blackQueenCastle);
+    void updateCastleRights(Piece* piece);
     std::string getEnPassantTarget(bool isWhite, Square oldSquare, Square newSquare) const;
+    std::string getCastlingRights() const;
 
     const sf::Texture& getPieceTexture(Piece* piece) const {
         return pieceTextures.at(piece->getType());
@@ -57,8 +58,9 @@ private:
         {'R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'}
     };
 
-    Piece* board[BOARD_SIZE][BOARD_SIZE];
-    std::map<PieceType, sf::Texture> pieceTextures;
+    Piece* board[BOARD_SIZE][BOARD_SIZE]{};
     sf::RenderTexture boardTexture;
     sf::Sprite boardSprite;
+    std::map<PieceType, sf::Texture> pieceTextures;
+    bool whiteKingCastle, whiteQueenCastle, blackKingCastle, blackQueenCastle;
 };

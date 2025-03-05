@@ -3,12 +3,10 @@
 Game::Game() :
 	window(sf::VideoMode({ 1200, 1200 }), "Chess Game", sf::Style::Close),
 	isWhiteTurn(true),
-	whiteKingCastle(true), whiteQueenCastle(true), blackKingCastle(true), blackQueenCastle(true),
-	enPassantTarget("-"),
 	fullMoveCount(1),
 	halfMoveClock(0),
-	isDragging(false),
-	selectedPiece(nullptr)
+	selectedPiece(nullptr),
+	enPassantTarget("-")
 {
 }
 
@@ -22,8 +20,8 @@ void Game::run() {
 
 		window.clear();
 		chessBoard.draw(window, selectedPiece);
-		if (isDragging && draggedSprite) {
-			window.draw(*draggedSprite);
+		if (selectedPiece) {
+			window.draw(*selectedPiece);
 		}
 		window.display();
 	}
@@ -39,13 +37,13 @@ void Game::handleEvents(const std::optional<sf::Event>& event) {
 		}
 	}
 	else if (const auto* mouseReleased = event->getIf<sf::Event::MouseButtonReleased>()) {
-		if (mouseReleased->button == sf::Mouse::Button::Left && isDragging) {
+		if (mouseReleased->button == sf::Mouse::Button::Left) {
 			onPieceReleased(mouseReleased);
 		}
 	}
 	else if (const auto* mouseMoved = event->getIf<sf::Event::MouseMoved>()) {
-		if (isDragging && draggedSprite.has_value()) {
-			draggedSprite->setPosition(sf::Vector2f(mouseMoved->position.x - dragOffset.x, mouseMoved->position.y - dragOffset.y));
+		if (selectedPiece) {
+			selectedPiece->setPosition(sf::Vector2f(mouseMoved->position.x - dragOffset.x, mouseMoved->position.y - dragOffset.y));
 		}
 	}
 }
@@ -54,15 +52,10 @@ void Game::onPieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPresse
 	int col = mouseButtonPressed->position.x / SQUARE_SIZE;
 	int row = mouseButtonPressed->position.y / SQUARE_SIZE;
 
-	if ((selectedPiece = chessBoard.getPiece(row, col))) {
-		isDragging = true;
-		draggedSprite.emplace(chessBoard.getPieceTexture(selectedPiece));
-		draggedSprite->setScale({ SQUARE_SIZE / draggedSprite->getTexture().getSize().x, SQUARE_SIZE / draggedSprite->getTexture().getSize().y });
-		draggedSprite->setPosition({ col * SQUARE_SIZE, row * SQUARE_SIZE });
-
-		dragOffset = { mouseButtonPressed->position.x - draggedSprite->getPosition().x, mouseButtonPressed->position.y - draggedSprite->getPosition().y };
-
-		legalMoves = selectedPiece->getLegalMoves(enPassantTarget);
+	if (selectedPiece = chessBoard.getPiece(row, col)) {
+		origianlPosition = selectedPiece->getPosition();
+		dragOffset = { mouseButtonPressed->position.x - selectedPiece->getPosition().x, mouseButtonPressed->position.y - selectedPiece->getPosition().y };
+		auto legalMoves = selectedPiece->getLegalMoves(enPassantTarget);
 		std::cout << "Legal Moves:";
 		for (const auto& move : legalMoves) {
 			std::cout << chessBoard.squareToLiteral(move) << " ";
@@ -80,32 +73,28 @@ void Game::onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonRele
 		Square oldSquare = selectedPiece->getSquare();
 
 		auto isValidMove = [&](const Square& pos) {
+			auto legalMoves = selectedPiece->getLegalMoves(enPassantTarget);
 			return std::find(legalMoves.begin(), legalMoves.end(), pos) != legalMoves.end();
 			};
 
-		if (isValidMove(newSquare) && newSquare != oldSquare) {
+		if (isValidMove(newSquare)) {
 			chessBoard.movePiece(oldSquare, newSquare);
-			chessBoard.updateCastleRights(selectedPiece, whiteKingCastle, whiteQueenCastle, blackKingCastle, blackQueenCastle);
+			chessBoard.updateCastleRights(selectedPiece);
 			if (selectedPiece->getType() == PieceType::W_PAWN || selectedPiece->getType() == PieceType::B_PAWN) {
 				enPassantTarget = chessBoard.getEnPassantTarget(selectedPiece->isWhite(), oldSquare, newSquare);
 			}
-			if (!isWhiteTurn) fullMoveCount++;
+			if (!isWhiteTurn) {
+				fullMoveCount++;
+			}
 			isWhiteTurn = !isWhiteTurn;
+		}
+		else {
+			selectedPiece->setPosition(origianlPosition);
 		}
 		std::cout << "EnPassant Targets:" << enPassantTarget << "\n";
 	}
 
 	// Reset dragging variables
-	draggedSprite.reset();
-	isDragging = false;
 	selectedPiece = nullptr;
 }
 
-std::string Game::getCastlingRights() const {
-	std::string rights;
-	if (whiteKingCastle) rights += "K";
-	if (whiteQueenCastle) rights += "Q";
-	if (blackKingCastle) rights += "k";
-	if (blackQueenCastle) rights += "q";
-	return rights.empty() ? "-" : rights;
-}
