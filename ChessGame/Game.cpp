@@ -123,47 +123,121 @@ void Game::onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonRele
 
 	selectedPiece = nullptr;
 }
+HANDLE stockfishInput = nullptr;  // For sending commands
+HANDLE stockfishOutput = nullptr; // For reading responses
+
+void createPipe(HANDLE& readPipe, HANDLE& writePipe) {
+	SECURITY_ATTRIBUTES saAttr;
+	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	saAttr.bInheritHandle = TRUE;
+	saAttr.lpSecurityDescriptor = nullptr;  // Explicitly use nullptr
+	if (!CreatePipe(&readPipe, &writePipe, &saAttr, 0)) {
+		std::cerr << "Failed to create pipes.\n";
+		exit(EXIT_FAILURE);
+	}
+	SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+}
 
 void Game::startStockfish() {
-	stockfishProcess = _popen("stockfish.exe", "r"); // Open for reading only
+	SECURITY_ATTRIBUTES saAttr;
+	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	saAttr.bInheritHandle = TRUE;
+	saAttr.lpSecurityDescriptor = nullptr;
 
-	if (!stockfishProcess) {
-		std::cerr << "Failed to start Stockfish! Check if stockfish.exe is in the same folder.\n";
+	HANDLE hReadPipe, hWritePipe;
+	HANDLE hReadPipeIn, hWritePipeIn; // For writing to Stockfish
+
+	// Create pipes for Stockfish input and output
+	if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0) ||
+		!CreatePipe(&hReadPipeIn, &hWritePipeIn, &saAttr, 0)) {
+		std::cerr << "Failed to create pipes.\n";
 		return;
 	}
 
-	char buffer[256];
-	while (fgets(buffer, sizeof(buffer), stockfishProcess)) {
-		std::string line(buffer);
-		std::cout << "[Stockfish] " << line; // Print what Stockfish sends back
-		if (line.find("uciok") != std::string::npos) {
-			break; // Stockfish initialized successfully
-		}
+	// Prevent inheritance of the read end of the output pipe and the write end of the input pipe
+	SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0);
+	SetHandleInformation(hWritePipeIn, HANDLE_FLAG_INHERIT, 0);
+
+	PROCESS_INFORMATION piProcInfo;
+	STARTUPINFOA siStartInfo = { sizeof(STARTUPINFOA) };
+
+	siStartInfo.hStdError = hWritePipe;
+	siStartInfo.hStdOutput = hWritePipe;
+	siStartInfo.hStdInput = hReadPipeIn; // Redirect Stockfish's input to the read end of our input pipe
+	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+
+	std::string command = "stockfish.exe";
+	std::vector<char> cmdVec(command.begin(), command.end());
+	cmdVec.push_back('\0'); // Ensure null termination
+
+	if (!CreateProcessA(NULL, cmdVec.data(), NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo)) {
+		std::cerr << "Failed to start Stockfish! Ensure stockfish.exe is in the same directory.\n";
+		return;
 	}
+
+	// Close unnecessary handles
+	CloseHandle(piProcInfo.hThread);
+	CloseHandle(hWritePipe);    // Close Stockfish's output write pipe
+	CloseHandle(hReadPipeIn);   // Close Stockfish's input read pipe
+
+	// Assign pipes for input and output
+	stockfishOutput = hReadPipe;   // Correctly assign the output pipe for reading
+	stockfishInput = hWritePipeIn; // Correctly assign the input pipe for writing
+
+	std::cout << "Stockfish started successfully!\n";
 }
 
 
 void Game::sendMoveToStockfish(const std::string& move) {
-	std::string command = "echo position startpos moves " + move + " | stockfish";
-	std::system(command.c_str());
+	if (!stockfishInput) return;
 
-	std::string goCommand = "echo go | stockfish";
-	std::system(goCommand.c_str());
+	Sleep(100);  // Give Stockfish time to initialize
+
+	std::string command = "position startpos moves " + move + "\n";
+	command += "go movetime 1000\n";
+
+	DWORD written;
+	if (!WriteFile(stockfishInput, command.c_str(), command.size(), &written, NULL)) {
+		std::cerr << "Failed to send command to Stockfish.\n";
+		return;
+	}
+
+	FlushFileBuffers(stockfishInput); // Ensure Stockfish receives the command immediately
 }
 
+
 std::string Game::getStockfishMove() {
-	if (!stockfishProcess) return "";
+	if (!stockfishOutput) return "";
 
-	char buffer[128];
-	std::string bestMove;
+	char buffer[256];
+	std::string output;
+	DWORD bytesRead;
+	int attempts = 0;
+	const int maxAttempts = 50;
 
-	while (fgets(buffer, sizeof(buffer), stockfishProcess)) {
-		std::string line(buffer);
-		if (line.find("bestmove") != std::string::npos) {
-			bestMove = line.substr(9, 4); // Extract move in format "e2e4"
-			break;
+	while (attempts++ < maxAttempts) {
+		Sleep(100);  // Allow Stockfish time to respond
+
+		// Check if there's output to read
+		if (!PeekNamedPipe(stockfishOutput, NULL, 0, NULL, &bytesRead, NULL) || bytesRead == 0)
+			continue;  // No data yet
+
+		// Read available data from the pipe
+		if (ReadFile(stockfishOutput, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0) {
+			buffer[bytesRead] = '\0';  // Null-terminate the buffer
+			output += buffer; // Append new data to full response
+
+			// Look for "bestmove" in the response
+			size_t pos = output.find("bestmove");
+			if (pos != std::string::npos) {
+				std::istringstream ss(output.substr(pos)); // Extract from "bestmove" onwards
+				std::string keyword, bestMove;
+				ss >> keyword >> bestMove; // Read "bestmove" and the move itself
+				return bestMove;  // Return only the move
+			}
 		}
 	}
 
-	return bestMove;
+	std::cerr << "Stockfish did not respond in time!\n";
+	return "";
 }

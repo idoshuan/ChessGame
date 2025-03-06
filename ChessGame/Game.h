@@ -1,6 +1,10 @@
 #pragma once
 
 #include <algorithm>
+#include <windows.h>
+#include <iostream>
+#include <string>
+#include <sstream> 
 
 #include "ChessBoard.h"
 #include "Piece.h"
