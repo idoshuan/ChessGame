@@ -55,7 +55,7 @@ public:
 		setPosition(sf::Vector2f(square.col * SQUARE_SIZE, square.row * SQUARE_SIZE));
 	}
 	virtual ~Piece() = default;
-	virtual std::vector<Square> getPossibleMoves(const Square enPassantTarget) const = 0;
+	virtual std::vector<Square> getPossibleMoves() const = 0;
 	static Piece* createPiece(PieceType type, Color color, const sf::Texture& texture, Square position, ChessBoard* board);
 	static PieceType charToPieceType(char ch);
 	static char pieceTypeToChar(PieceType type);

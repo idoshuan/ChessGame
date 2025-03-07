@@ -1,7 +1,7 @@
 #include "Knight.h"
 #include "ChessBoard.h"
 
-std::vector<Square> Knight::getPossibleMoves(const Square enPassantTarget) const {
+std::vector<Square> Knight::getPossibleMoves() const {
 	std::vector<Square> moves;
 	Square directions[] = { {2, 1}, {2, -1}, {1, 2}, {1, -2}, {-1, 2}, {-1, -2}, {-2, 1}, {-2, -1} }; // L-shape moves
 

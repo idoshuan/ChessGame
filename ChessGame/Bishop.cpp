@@ -1,7 +1,7 @@
 #include "Bishop.h"
 #include "ChessBoard.h"
 
-std::vector<Square> Bishop::getPossibleMoves(const Square enPassantTarget) const {
+std::vector<Square> Bishop::getPossibleMoves() const {
 	std::vector<Square> moves;
 	Square directions[] = { {1, 1}, {-1, -1}, {1, -1}, {-1, 1} }; // Right Up, Left Down, Left Up, Right Down
 

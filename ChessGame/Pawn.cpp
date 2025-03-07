@@ -1,7 +1,7 @@
 #include "Pawn.h"
 #include "ChessBoard.h"
 
-std::vector<Square> Pawn::getPossibleMoves(const Square enPassantTarget) const {
+std::vector<Square> Pawn::getPossibleMoves() const {
 	std::vector<Square> moves;
 	int dir = (type == PieceType::W_PAWN) ? -1 : 1; // White moves up (-1), Black moves down (+1)
 	int startRow = (type == PieceType::W_PAWN) ? 6 : 1;
@@ -23,11 +23,6 @@ std::vector<Square> Pawn::getPossibleMoves(const Square enPassantTarget) const {
 				moves.push_back(captureSquare);
 			}
 		}
-	}
-
-	// En Passant Capture
-	if (enPassantTarget.row == square.row + dir && abs(enPassantTarget.col - square.col) == 1) {
-		moves.push_back(enPassantTarget);
 	}
 
 	return moves;

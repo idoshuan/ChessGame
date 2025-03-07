@@ -33,6 +33,6 @@ private:
 
     void startStockfish();
     void sendMoveToStockfish(const std::string& move);
-    std::string getStockfishMove();
+    std::vector<std::string> getStockfishMoves(int moveCount = 4);
     FILE* stockfishProcess = nullptr; // Stockfish proces
 };

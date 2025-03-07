@@ -1,7 +1,7 @@
 #include "Queen.h"
 #include "ChessBoard.h"
 
-std::vector<Square> Queen::getPossibleMoves(const Square enPassantTarget) const {
+std::vector<Square> Queen::getPossibleMoves() const {
 	std::vector<Square> moves;
     Square directions[] = { {1, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 0}, {-1, 0}, {0, 1}, {0, -1} }; // All Directions
 

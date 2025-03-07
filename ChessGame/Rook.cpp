@@ -1,7 +1,7 @@
 #include "Rook.h"
 #include "ChessBoard.h"
 
-std::vector<Square> Rook::getPossibleMoves(const Square enPassantTarget) const {
+std::vector<Square> Rook::getPossibleMoves() const {
     std::vector<Square> moves;
     Square directions[] = { {0, 1}, {0, -1}, {1, 0}, {-1, 0} }; // Right, Left, Down, Up
 

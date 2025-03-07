@@ -23,8 +23,11 @@ void Game::run() {
 	std::cout << "Sending move: " << testMove << std::endl;
 	sendMoveToStockfish(testMove);
 	// Get Stockfish's response
-	std::string stockfishMove = getStockfishMove();
-	std::cout << "Stockfish's move: " << stockfishMove << std::endl;
+	auto stockfishMove = getStockfishMoves();
+	for (auto& move : stockfishMove) {
+		std::cout << move << " ";
+	}
+	std::cout << "\n";
 
 	while (window.isOpen() && isRunning) {
 		while (std::optional<sf::Event> event = window.pollEvent()) {
@@ -105,8 +108,6 @@ void Game::onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonRele
 		if (isValidMove(newSquare)) {
 
 			chessBoard.movePiece(oldSquare, newSquare);
-			chessBoard.updateCastleRights(selectedPiece);
-
 			
 			if (!isWhiteTurn) {
 				fullMoveCount++;
@@ -167,8 +168,8 @@ void Game::startStockfish() {
 	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
 	std::string command = "stockfish.exe";
-	std::vector<char> cmdVec(command.begin(), command.end());
-	cmdVec.push_back('\0'); // Ensure null termination
+	std::vector<char> cmdVec(command.begin(), command.end()); // CreateProcessA() requires a modifiable char* because Windows might modify the command string internally.
+	cmdVec.push_back('\0'); 
 
 	if (!CreateProcessA(NULL, cmdVec.data(), NULL, NULL, TRUE, 0, NULL, NULL, &siStartInfo, &piProcInfo)) {
 		std::cerr << "Failed to start Stockfish! Ensure stockfish.exe is in the same directory.\n";
@@ -206,38 +207,58 @@ void Game::sendMoveToStockfish(const std::string& move) {
 }
 
 
-std::string Game::getStockfishMove() {
-	if (!stockfishOutput) return "";
+std::vector<std::string> Game::getStockfishMoves(int moveCount) {
+	if (!stockfishOutput) return {};
 
-	char buffer[256];
+	std::vector<std::string> bestMoves;
 	std::string output;
+	char buffer[256];
 	DWORD bytesRead;
 	int attempts = 0;
 	const int maxAttempts = 50;
 
+	// **Request multiple best moves from Stockfish**
+	std::string command = "setoption name MultiPV value " + std::to_string(moveCount) + "\n";
+	command += "go movetime 1000\n";
+
+	DWORD written;
+	WriteFile(stockfishInput, command.c_str(), command.size(), &written, NULL);
+	FlushFileBuffers(stockfishInput);
+
 	while (attempts++ < maxAttempts) {
 		Sleep(100);  // Allow Stockfish time to respond
 
-		// Check if there's output to read
 		if (!PeekNamedPipe(stockfishOutput, NULL, 0, NULL, &bytesRead, NULL) || bytesRead == 0)
-			continue;  // No data yet
+			continue;
 
 		// Read available data from the pipe
 		if (ReadFile(stockfishOutput, buffer, sizeof(buffer) - 1, &bytesRead, NULL) && bytesRead > 0) {
 			buffer[bytesRead] = '\0';  // Null-terminate the buffer
-			output += buffer; // Append new data to full response
+			output += buffer;
 
-			// Look for "bestmove" in the response
-			size_t pos = output.find("bestmove");
-			if (pos != std::string::npos) {
-				std::istringstream ss(output.substr(pos)); // Extract from "bestmove" onwards
-				std::string keyword, bestMove;
-				ss >> keyword >> bestMove; // Read "bestmove" and the move itself
-				return bestMove;  // Return only the move
+			// Extract moves from "info ... pv"
+			std::istringstream ss(output);
+			std::string token;
+			while (ss >> token) {
+				if (token == "pv") { // Look for "pv" which contains the best move sequence
+					std::string move;
+					ss >> move; // Read the first move in the PV line
+					if (!move.empty() && bestMoves.size() < moveCount) {
+						bestMoves.push_back(move);
+					}
+				}
 			}
+
+			// Stop if we got the required number of moves
+			if (bestMoves.size() >= moveCount) break;
 		}
 	}
 
-	std::cerr << "Stockfish did not respond in time!\n";
-	return "";
+	if (bestMoves.empty()) {
+		std::cerr << "Stockfish did not respond in time or didn't return enough moves!\n";
+	}
+
+	return bestMoves;
 }
+
+

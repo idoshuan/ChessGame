@@ -81,5 +81,6 @@ private:
 
     Piece *whiteKing, *blackKing;
     Square enPassantTarget;
+    Square castleTarget;
     bool whiteKingCastle, whiteQueenCastle, blackKingCastle, blackQueenCastle;
 };
