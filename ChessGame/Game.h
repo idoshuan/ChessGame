@@ -5,13 +5,17 @@
 #include <iostream>
 #include <string>
 #include <sstream> 
+#include <thread>
+#include <atomic>
 
 #include "ChessBoard.h"
 #include "Piece.h"
+#include "Stockfish.h"
 
 class Game {
 public:
     Game();
+    ~Game();
     void run();
 
 private:
@@ -31,8 +35,10 @@ private:
     void onPieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPressed);
     void onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonReleased);
 
-    void startStockfish();
-    void sendMoveToStockfish(const std::string& move);
-    std::vector<std::string> getStockfishMoves(int moveCount = 4);
-    FILE* stockfishProcess = nullptr; // Stockfish proces
+    void runStockfish(const std::string& fen, int n);
+
+    Stockfish stockfish;
+    std::thread stockfishThread;  
+    std::atomic<bool> isStockfishRunning;  
 };
+

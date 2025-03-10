@@ -34,7 +34,7 @@ public:
     bool doesMoveLeaveKingInCheck(Square from, Square to);
     bool isKingInCheck(bool isWhite) const;
 
-    std::string generateFEN(const std::string& castlingRights, bool isWhiteTurn, const std::string& enPassant, int halfMoveClock, int fullMoveCount) const;
+    std::string generateFEN(bool isWhiteTurn, int halfMoveClock, int fullMoveCount) const;
     std::string boardToFEN() const;
 
     const sf::Texture& getPieceTexture(Piece* piece) const {

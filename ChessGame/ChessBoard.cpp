@@ -155,6 +155,8 @@ void ChessBoard::movePiece(Square from, Square to) {
 		}
 	}
 
+	updateCastleRights(movingPiece);
+
 	delete board[to.row][to.col]; // Capture/Move the piece normally
 	board[to.row][to.col] = movingPiece;
 	board[from.row][from.col] = nullptr;
@@ -163,7 +165,6 @@ void ChessBoard::movePiece(Square from, Square to) {
 	movingPiece->setPosition({ to.col * SQUARE_SIZE, to.row * SQUARE_SIZE });
 
 	updateEnPassant(movingPiece, from, to);
-	updateCastleRights(movingPiece);
 }
 
 
@@ -285,33 +286,6 @@ bool ChessBoard::isKingInCheck(bool isWhite) const {
 }
 
 
-std::string ChessBoard::generateFEN(const std::string& castlingRights, bool isWhiteTurn, const std::string& enPassant, int halfMoveClock, int fullMoveCount) const {
-	return boardToFEN() + " " + (isWhiteTurn ? "w" : "b") + " " + (castlingRights.empty() ? "-" : castlingRights) + " " + (enPassant.empty() ? "-" : enPassant) + " " + std::to_string(halfMoveClock) + " " + std::to_string(fullMoveCount);
-}
-
-std::string ChessBoard::boardToFEN() const {
-	std::string fen;
-	for (int row = 0; row < BOARD_SIZE; ++row) {
-		int emptyCount = 0;
-		for (int col = 0; col < BOARD_SIZE; ++col) {
-			char piece = Piece::pieceTypeToChar(board[row][col] ? board[row][col]->getType() : PieceType::NONE);
-			if (piece == '.') {
-				emptyCount++;
-			}
-			else {
-				if (emptyCount > 0) {
-					fen += std::to_string(emptyCount);
-					emptyCount = 0;
-				}
-				fen += piece;
-			}
-		}
-		if (emptyCount > 0) fen += std::to_string(emptyCount);
-		if (row < BOARD_SIZE - 1) fen += "/";
-	}
-	return fen;
-}
-
 /**
  * @brief  Updates castling rights when a king or rook moves.
  *
@@ -364,6 +338,33 @@ std::string ChessBoard::getCastlingRights() const {
 	if (blackKingCastle) rights += "k";
 	if (blackQueenCastle) rights += "q";
 	return rights.empty() ? "-" : rights;
+}
+
+std::string ChessBoard::generateFEN(bool isWhiteTurn, int halfMoveClock, int fullMoveCount) const {
+	return boardToFEN() + " " + (isWhiteTurn ? "w" : "b") + " " + getCastlingRights() + " " + (enPassantTarget == Square{-1,-1} ? "-" : squareToLiteral(enPassantTarget)) + " " + std::to_string(halfMoveClock) + " " + std::to_string(fullMoveCount);
+}
+
+std::string ChessBoard::boardToFEN() const {
+	std::string fen;
+	for (int row = 0; row < BOARD_SIZE; ++row) {
+		int emptyCount = 0;
+		for (int col = 0; col < BOARD_SIZE; ++col) {
+			char piece = Piece::pieceTypeToChar(board[row][col] ? board[row][col]->getType() : PieceType::NONE);
+			if (piece == '.') {
+				emptyCount++;
+			}
+			else {
+				if (emptyCount > 0) {
+					fen += std::to_string(emptyCount);
+					emptyCount = 0;
+				}
+				fen += piece;
+			}
+		}
+		if (emptyCount > 0) fen += std::to_string(emptyCount);
+		if (row < BOARD_SIZE - 1) fen += "/";
+	}
+	return fen;
 }
 
 
