@@ -5,8 +5,7 @@
 #include <iostream>
 #include <string>
 #include <sstream> 
-#include <thread>
-#include <atomic>
+#include <future>
 
 #include "ChessBoard.h"
 #include "Piece.h"
@@ -15,7 +14,6 @@
 class Game {
 public:
     Game();
-    ~Game();
     void run();
 
 private:
@@ -34,11 +32,12 @@ private:
     void handleEvents(const std::optional<sf::Event>& event, bool& isRunning);
     void onPieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPressed);
     void onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonReleased);
+    void applyStockfishMove(const std::string& move);
 
     void runStockfish(const std::string& fen, int n);
 
     Stockfish stockfish;
-    std::thread stockfishThread;  
-    std::atomic<bool> isStockfishRunning;  
+    std::future<std::vector<std::string>> stockfishFuture;
+    bool isAwaitingStockfish = false;
 };
 

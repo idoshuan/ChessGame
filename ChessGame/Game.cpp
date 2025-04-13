@@ -11,13 +11,7 @@ Game::Game() :
 	selectedPiece(nullptr),
 	enPassantTarget("-"),
 	stockfish("stockfish.exe")
-{}
-
-Game::~Game() {
-	isStockfishRunning = false;  // Stop Stockfish from running
-	if (stockfishThread.joinable()) {
-		stockfishThread.join();  // Wait for Stockfish to finish
-	}
+{
 }
 
 /**
@@ -29,6 +23,26 @@ void Game::run() {
 	while (window.isOpen() && isRunning) {
 		while (std::optional<sf::Event> event = window.pollEvent()) {
 			handleEvents(event, isRunning);
+		}
+
+		// If it's black's turn and we're not waiting for Stockfish, start async move generation
+		if (!isWhiteTurn && !isAwaitingStockfish) {
+			std::string fen = chessBoard.generateFEN(isWhiteTurn, halfMoveClock, fullMoveCount);
+			stockfishFuture = std::async(std::launch::async, &Stockfish::getBestMoves, &stockfish, fen, 3); // 3 best moves
+			isAwaitingStockfish = true;
+		}
+
+		// If Stockfish has returned a move, apply it
+		if (isAwaitingStockfish && stockfishFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+			std::vector<std::string> moves = stockfishFuture.get();
+			if (!moves.empty()) {
+				std::cout << "Stockfish recommends:\n";
+				for (const auto& move : moves) {
+					std::cout << move << std::endl;
+				}
+				applyStockfishMove(moves[0]); // play best move
+			}
+			isAwaitingStockfish = false;
 		}
 
 		window.clear();
@@ -72,7 +86,7 @@ void Game::onPieceClicked(const sf::Event::MouseButtonPressed* mouseButtonPresse
 	int row = mouseButtonPressed->position.y / SQUARE_SIZE;
 
 	if (auto piece = chessBoard.getPiece({ row, col }); piece && piece->isWhite() == isWhiteTurn) {
-		selectedPiece = piece;		
+		selectedPiece = piece;
 		origianlPosition = selectedPiece->getPosition();
 		dragOffset = { mouseButtonPressed->position.x - selectedPiece->getPosition().x, mouseButtonPressed->position.y - selectedPiece->getPosition().y };
 	}
@@ -107,19 +121,33 @@ void Game::onPieceReleased(const sf::Event::MouseButtonReleased* mouseButtonRele
 			if (chessBoard.isCheckMate(isWhiteTurn)) {
 				std::cout << "Checkmate!";
 			}
-			else if (!isStockfishRunning) {
-					isStockfishRunning = true;
-					std::string fen = chessBoard.generateFEN(isWhiteTurn, halfMoveClock, fullMoveCount);
-					stockfishThread = std::thread(&Game::runStockfish, this, fen, 3);
-					stockfishThread.detach();  // Allow it to run independently
-				}
-			}
 		}
 		else {
 			selectedPiece->setPosition(origianlPosition);
 		}
+	}
 
 	selectedPiece = nullptr;
+}
+
+void Game::applyStockfishMove(const std::string& move) {
+	if (move.length() < 4) {
+		return;
+	}
+
+	Square from = chessBoard.literalToSquare(move.substr(0, 2));
+	Square to = chessBoard.literalToSquare(move.substr(2, 2));
+
+	chessBoard.movePiece(from, to);
+
+	if (!isWhiteTurn) {
+		fullMoveCount++;
+	}
+	isWhiteTurn = !isWhiteTurn;
+
+	if (chessBoard.isCheckMate(isWhiteTurn)) {
+		std::cout << "Checkmate!\n";
+	}
 }
 
 
@@ -130,8 +158,6 @@ void Game::runStockfish(const std::string& fen, int n) {
 	for (const auto& move : bestMoves) {
 		std::cout << move << std::endl;
 	}
-
-	isStockfishRunning = false;  // Allow new Stockfish calls
 }
 
 
